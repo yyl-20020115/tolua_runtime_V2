@@ -2,7 +2,8 @@ cd luajit-2.1/src
 
 # Android/ARM, armeabi-v7a (ARMv7 VFP), Android 4.0+ (ICS)
 mkdir -p Plugins/Android/libs/armeabi-v7a
-NDK=/c/android-ndk-r13b
+#NDK=/c/android-ndk-r13b
+NDK=~/opt/ndk-r13b
 NDKABI=19
 NDKVER=$NDK/toolchains/arm-linux-androideabi-4.9
 NDKP=$NDKVER/prebuilt/windows-x86_64/bin/arm-linux-androideabi-
