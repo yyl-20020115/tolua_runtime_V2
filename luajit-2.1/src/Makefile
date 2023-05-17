@@ -604,8 +604,8 @@ E= @echo
 ##############################################################################
 # Make targets.
 ##############################################################################
-
-default all:	$(TARGET_T)
+# CHANGED TO BUILD STATIC LIB ONLY
+default all:	$(TARGET_O)
 
 amalg:
 	$(MAKE) all "LJCORE_O=ljamalg.o"

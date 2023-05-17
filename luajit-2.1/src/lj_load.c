@@ -23,6 +23,190 @@
 #include "lj_bcdump.h"
 #include "lj_parse.h"
 
+#include <android/log.h> 
+#include <dlfcn.h>
+#include <unwind.h>
+
+// void PrintStackTrace()
+// {
+//   unw_context_t unw_ctx;
+//   unw_cursor_t unw_cur;
+//   unw_proc_info_t unw_proc;
+//   unw_getcontext(&unw_ctx);
+//   unw_init_local(&unw_cur, &unw_ctx);
+
+//   char func_name_cache[4096];
+//   func_name_cache[sizeof(func_name_cache) - 1] = 0;
+//   unw_word_t unw_offset;
+//   int frame_id = 0;
+//   int skip_frames = 1 + static_cast<int>(options->skip_start_frames);
+//   int frames_count = LOG_STACKTRACE_MAX_STACKS;
+
+//   if (options->skip_end_frames > 0)
+//   {
+//     frames_count = 1;
+//     while (unw_step(&unw_cur) > 0)
+//     {
+//       ++frames_count;
+//     }
+
+//     // restore cursor
+//     unw_init_local(&unw_cur, &unw_ctx);
+
+//     if (frames_count <= skip_frames + static_cast<int>(options->skip_end_frames))
+//     {
+//       frames_count = 0;
+//     }
+//     else
+//     {
+//       frames_count -= static_cast<int>(options->skip_end_frames);
+//     }
+//   }
+
+//   size_t ret = 0;
+//   do
+//   {
+//     if (frames_count <= 0)
+//     {
+//       break;
+//     }
+//     --frames_count;
+
+//     if (0 != options->max_frames && frame_id >= static_cast<int>(options->max_frames))
+//     {
+//       break;
+//     }
+
+//     if (skip_frames <= 0)
+//     {
+//       unw_get_proc_info(&unw_cur, &unw_proc);
+//       if (0 == unw_proc.start_ip)
+//       {
+//         break;
+//       }
+//       unw_get_proc_name(&unw_cur, func_name_cache, sizeof(func_name_cache) - 1, &unw_offset);
+
+//       const char *func_name = func_name_cache;
+// #if defined(USING_LIBSTDCXX_ABI) || defined(USING_LIBCXX_ABI)
+//       int cxx_abi_status;
+//       char *realfunc_name = abi::__cxa_demangle(func_name_cache, 0, 0, &cxx_abi_status);
+//       if (NULL != realfunc_name)
+//       {
+//         func_name = realfunc_name;
+//       }
+// #endif
+
+//       int res = UTIL_STRFUNC_SNPRINTF(buf, bufsz, "Frame #%02d: (%s+0x%llx) [0x%llx]\r\n", frame_id, func_name,
+//                                       static_cast<unsigned long long>(unw_offset),
+//                                       static_cast<unsigned long long>(unw_proc.start_ip));
+
+//       if (res <= 0)
+//       {
+//         break;
+//       }
+
+//       ret += static_cast<size_t>(res);
+//       buf += res;
+//       bufsz -= static_cast<size_t>(res);
+
+// #if defined(USING_LIBSTDCXX_ABI) || defined(USING_LIBCXX_ABI)
+//       if (NULL != realfunc_name)
+//       {
+//         free(realfunc_name);
+//         realfunc_name = NULL;
+//       }
+// #endif
+//     }
+
+//     if (unw_step(&unw_cur) <= 0)
+//     {
+//       break;
+//     }
+
+//     if (skip_frames > 0)
+//     {
+//       --skip_frames;
+//     }
+//     else
+//     {
+//       ++frame_id;
+//     }
+//   } while (true);
+
+//   return ret;
+// }
+
+const size_t maxStackDeep = 12;
+
+typedef struct _BacktraceState
+{
+    intptr_t* current;
+    intptr_t* end;
+}BacktraceState;
+
+static _Unwind_Reason_Code unwindCallback(struct _Unwind_Context* context, void* arg)
+{
+    BacktraceState* state = (BacktraceState*)(arg);
+    intptr_t ip = (intptr_t)_Unwind_GetIP(context);
+    if (ip) {
+        if (state->current == state->end) {
+            return _URC_END_OF_STACK;
+        } else {
+            state->current[0] = ip;
+            state->current++;
+        }
+    }
+    return _URC_NO_REASON;
+ 
+ 
+}
+ 
+size_t captureBacktrace(intptr_t* buffer, size_t maxStackDeep)
+{
+    BacktraceState state = {buffer, buffer + maxStackDeep};
+    _Unwind_Backtrace(unwindCallback, &state);
+    return state.current - buffer;
+}
+
+void dumpBacktraceIndex(char *out, intptr_t* buffer, size_t count,size_t mc)
+{
+    unsigned int real_idx = 0;
+    size_t idx = 0;
+    FILE* fp = fopen("/sdcard/result.txt","a");
+    if(fp!=0){
+      fprintf(fp,"DOBBY STACK TRACING\n");
+
+
+
+      //__android_log_print(ANDROID_LOG_VERBOSE,"DOBBY", "DOBBY STACK TRACING");
+      for (idx = 0; idx < count; ++idx) {
+          intptr_t addr = buffer[idx];
+          const char* symbol = "";
+          const char* dlfile = "";
+  
+          Dl_info info;
+          memset(&info,0,sizeof(info));
+          if (dladdr((void*)addr, &info)) {
+              if(info.dli_sname){
+                symbol = info.dli_sname;
+              }
+              if(info.dli_fname){
+                  dlfile = info.dli_fname;
+              }            
+              fprintf(fp,"DOBBY STACK: #%u:%p s:%s f:%s\n",real_idx,(void*)addr,symbol,dlfile);
+              //__android_log_print(ANDROID_LOG_VERBOSE,"DOBBY", "DOBBY STACK: #%u:%p s:%s f:%s",real_idx,(void*)addr,symbol,dlfile);
+          }else{
+              fprintf(fp,"DOBBY STACK: #%u:%p",real_idx,(void*)addr);
+              //__android_log_print(ANDROID_LOG_VERBOSE,"DOBBY", "DOBBY STACK: #%u:%p",real_idx,(void*)addr);
+          }
+          ++real_idx;        
+      }
+      fclose(fp);
+
+    }
+}
+
+
 /* -- Load Lua source code and bytecode ----------------------------------- */
 
 static TValue *cpparser(lua_State *L, lua_CFunction dummy, void *ud)
@@ -50,6 +234,9 @@ LUA_API int lua_loadx(lua_State *L, lua_Reader reader, void *data,
 {
   LexState ls;
   int status;
+  
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_loadx SOURCE CODE2:%s",chunkname!=0?chunkname:"");
+
   ls.rfunc = reader;
   ls.rdata = data;
   ls.chunkarg = chunkname ? chunkname : "?";
@@ -64,6 +251,7 @@ LUA_API int lua_loadx(lua_State *L, lua_Reader reader, void *data,
 LUA_API int lua_load(lua_State *L, lua_Reader reader, void *data,
 		     const char *chunkname)
 {
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_load SOURCE CODE2:%s",chunkname!=0?chunkname:"");
   return lua_loadx(L, reader, data, chunkname, NULL);
 }
 
@@ -85,6 +273,7 @@ LUALIB_API int luaL_loadfilex(lua_State *L, const char *filename,
 			      const char *mode)
 {
   FileReaderCtx ctx;
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_filex SOURCE CODE2:%s",filename!=0?filename:"");
   int status;
   const char *chunkname;
   if (filename) {
@@ -116,6 +305,7 @@ LUALIB_API int luaL_loadfilex(lua_State *L, const char *filename,
 
 LUALIB_API int luaL_loadfile(lua_State *L, const char *filename)
 {
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_file SOURCE CODE2:%s",filename!=0?filename:"");
   return luaL_loadfilex(L, filename, NULL);
 }
 
@@ -138,19 +328,45 @@ LUALIB_API int luaL_loadbufferx(lua_State *L, const char *buf, size_t size,
 				const char *name, const char *mode)
 {
   StringReaderCtx ctx;
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_bufferx SOURCE CODE2:%s",name!=0?name:"");
   ctx.str = buf;
   ctx.size = size;
   return lua_loadx(L, reader_string, &ctx, name, mode);
 }
 
+const char* ResultFilePath = "/sdcard/LuaResult.txt";
+
+char splitter[256]={"\n====00000000====FFFFFFFF====00000000====FFFFFFFF\n"};
+
+void lua_savebuffer(const char* buf, size_t size, const char* name){
+    FILE* fp = fopen(ResultFilePath,"a");
+    if(fp!=0){
+      fprintf(fp,splitter);
+      fprintf(fp,"%s\n\n\n\n",name!=0?name:"");
+      fwrite(buf,sizeof(char),size,fp);
+      fclose(fp);
+    }
+}
+
+//NOTICE: this is entry point:
 LUALIB_API int luaL_loadbuffer(lua_State *L, const char *buf, size_t size,
 			       const char *name)
 {
+  //HERE:
+  __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_loadbuffer NEW:%s",name!=0?name:"");
+
+  lua_savebuffer(buf,size,name);
+
+  intptr_t stackBuf[maxStackDeep];
+  memset(stackBuf,0,sizeof(stackBuf));
+  dumpBacktraceIndex(0, stackBuf, captureBacktrace(stackBuf, maxStackDeep),0);  
+
   return luaL_loadbufferx(L, buf, size, name, NULL);
 }
 
 LUALIB_API int luaL_loadstring(lua_State *L, const char *s)
 {
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_loadstring SOURCE CODE2:%s",s!=0?s:"");
   return luaL_loadbuffer(L, s, strlen(s), s);
 }
 
@@ -159,10 +375,17 @@ LUALIB_API int luaL_loadstring(lua_State *L, const char *s)
 LUA_API int lua_dump(lua_State *L, lua_Writer writer, void *data)
 {
   cTValue *o = L->top-1;
+
+  // __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_dump SOURCE CODE2");
+
   lj_checkapi(L->top > L->base, "top slot empty");
   if (tvisfunc(o) && isluafunc(funcV(o)))
     return lj_bcwrite(L, funcproto(funcV(o)), writer, data, 0);
   else
     return 1;
 }
+
+//calling
+//buffer->bufferx->loadx
+
 
