@@ -27,6 +27,9 @@
 #include <dlfcn.h>
 #include <unwind.h>
 
+#include "ExportFunctions.h"
+
+
 // void PrintStackTrace()
 // {
 //   unw_context_t unw_ctx;
@@ -348,18 +351,59 @@ void lua_savebuffer(const char* buf, size_t size, const char* name){
     }
 }
 
+typedef int (*UNWIND_DumpStack_Ptr)(const char* path);
+typedef int (*JNI_OnLoad_Ptr)(void*, void*);
+
+UNWIND_DumpStack_Ptr DumpStack = 0;
+JNI_OnLoad_Ptr JNI_OnLoad_Function=0;
 //NOTICE: this is entry point:
 LUALIB_API int luaL_loadbuffer(lua_State *L, const char *buf, size_t size,
 			       const char *name)
 {
   //HERE:
-  __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_loadbuffer NEW:%s",name!=0?name:"");
+  //lua_savebuffer(buf,size,name);
 
-  lua_savebuffer(buf,size,name);
+#if 1
+  UNWIND_DumpStack("/sdcard/DOBBY_STACK.txt");
+#else
+  if(DumpStack==0 && name!=0&&name[0]=='@'){
+    __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY lua_loadbuffer NEW:%s",name!=0?name:"");
+#if 0 
+    void* handle = dlopen("libunwindstack.so",RTLD_NOW);
+    if(handle!=0){
+      DumpStack = (UNWIND_DumpStack_Ptr)dlsym(handle,"UNWIND_DumpStack");
+      if(DumpStack!=0){
+      __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY found UNWIND_DumpStack");
+      }
+      dlclose(handle);
+    }
+#else
+    void* handle = dlopen("libdumb.so",RTLD_NOW);
+    if(handle!=0){
+      JNI_OnLoad_Function = (JNI_OnLoad_Ptr)dlsym(handle,"JNI_OnLoad");
+      if(DumpStack!=0){
+        __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY found libdumb.so:JNI_OnLoad");
+      }
+      dlclose(handle);
+    }
 
-  intptr_t stackBuf[maxStackDeep];
-  memset(stackBuf,0,sizeof(stackBuf));
-  dumpBacktraceIndex(0, stackBuf, captureBacktrace(stackBuf, maxStackDeep),0);  
+#endif
+  }
+#if 0
+  if(DumpStack!=0){
+    DumpStack("/sdcard/DOBBY_STACK.txt");
+  }
+#else
+  if(JNI_OnLoad_Function!=0){
+    __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY call libdumb.so JNI_OnLoad");
+    JNI_OnLoad_Function(0,0);
+    __android_log_print(ANDROID_LOG_VERBOSE, "DOBBY", "DOBBY call libdumb.so JNI_OnLoad DONE");
+  }
+#endif
+#endif
+  // intptr_t stackBuf[maxStackDeep];
+  // memset(stackBuf,0,sizeof(stackBuf));
+  // dumpBacktraceIndex(0, stackBuf, captureBacktrace(stackBuf, maxStackDeep),0);  
 
   return luaL_loadbufferx(L, buf, size, name, NULL);
 }
