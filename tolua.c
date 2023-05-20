@@ -270,9 +270,23 @@ LUA_API int32_t tolua_tointeger(lua_State *L, int idx)
 {
     return (int32_t)lua_tointeger(L, idx);
 }
+static const size_t maxStackDeep = 120;
+size_t captureBacktrace(intptr_t* buffer, size_t maxStackDeep);
+ 
+void dumpBacktraceIndex(char *out, intptr_t* buffer, size_t count,size_t mc);
 
 LUALIB_API int tolua_loadbuffer(lua_State *L, const char *buff, int sz, const char *name)
 {
+    //INSPECT
+
+    // char buffer[1024];
+    // memset(buffer,0,sizeof(buffer));
+    // snprintf(buffer,sizeof(buffer),"DOBBY tolua_loadbuffer(%s)",name==0?"":name);
+    
+    // intptr_t stackBuf[maxStackDeep]={0};
+    // dumpBacktraceIndex(buffer, stackBuf, captureBacktrace(stackBuf, maxStackDeep),0);
+
+
     return luaL_loadbuffer(L, buff, (size_t)sz, name);
 }
 

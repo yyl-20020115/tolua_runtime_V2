@@ -24,19 +24,22 @@ NODOTABIVER= 51
 # removing the '#' in front of them. Make sure you force a full recompile
 # with "make clean", followed by "make" if you change any options.
 #
-DEFAULT_CC =clang 
+DEFAULT_CC =clang
 #
 # LuaJIT builds as a native 32 or 64 bit binary by default.
-CC= $(DEFAULT_CC)
+ifeq ($(USE_64),1)
+  CC= $(DEFAULT_CC)
+else
 #
 # Use this if you want to force a 32 bit build on a 64 bit multilib OS.
-#CC= $(DEFAULT_CC) -m32
+  CC= $(DEFAULT_CC) -m32
+endif
 #
 # Since the assembler part does NOT maintain a frame pointer, it's pointless
 # to slow down the C part by not omitting it. Debugging, tracebacks and
 # unwinding are not affected -- the assembler part has frame unwind
 # information and GCC emits it where needed (x64) or with -g (see CCDEBUG).
-CCOPT= -O2 -fomit-frame-pointer
+CCOPT= -fno-omit-frame-pointer
 # Use this if you want to generate a smaller binary (but it's slower):
 #CCOPT= -Os -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
@@ -49,12 +52,12 @@ CCOPT= -O2 -fomit-frame-pointer
 #
 CCOPT_x86= -march=i686 -msse -msse2 -mfpmath=sse
 CCOPT_x64=
-CCOPT_arm=
-CCOPT_arm64=
+CCOPT_arm= -march=armv7-a
+CCOPT_arm64= -march=armv8a
 CCOPT_ppc=
 CCOPT_mips=
 #
-CCDEBUG=
+CCDEBUG= -g
 # Uncomment the next line to generate debug information:
 #CCDEBUG= -g
 #
@@ -197,7 +200,6 @@ HOST_RM?= rm -f
 # If left blank, minilua is built and used. You can supply an installed
 # copy of (plain) Lua 5.1 or 5.2, plus Lua BitOp. E.g. with: HOST_LUA=lua
 HOST_LUA=
-
 HOST_XCFLAGS= -I.
 HOST_XLDFLAGS=
 HOST_XLIBS=
@@ -205,7 +207,7 @@ HOST_ACFLAGS= $(CCOPTIONS) $(HOST_XCFLAGS) $(TARGET_ARCH) $(HOST_CFLAGS)
 HOST_ALDFLAGS= $(LDOPTIONS) $(HOST_XLDFLAGS) $(HOST_LDFLAGS)
 HOST_ALIBS= $(HOST_XLIBS) $(LIBS) $(HOST_LIBS)
 
-STATIC_CC = $(CROSS)$(CC)
+STATIC_CC = $(CROSS)$(CC) -fPIC
 DYNAMIC_CC = $(CROSS)$(CC) -fPIC
 TARGET_CC= $(STATIC_CC)
 TARGET_STCC= $(STATIC_CC)
@@ -235,20 +237,23 @@ TARGET_ASHLDFLAGS= $(LDOPTIONS) $(TARGET_XSHLDFLAGS) $(TARGET_FLAGS) $(TARGET_SH
 TARGET_ALIBS= $(TARGET_XLIBS) $(LIBS) $(TARGET_LIBS)
 
 TARGET_TESTARCH=$(shell $(TARGET_CC) $(TARGET_TCFLAGS) -E lj_arch.h -dM)
+
 ifneq (,$(findstring LJ_TARGET_X64 ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= x64
 else
 ifneq (,$(findstring LJ_TARGET_X86 ,$(TARGET_TESTARCH)))
   TARGET_LJARCH= x86
 else
-ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= arm
-else
 ifneq (,$(findstring LJ_TARGET_ARM64 ,$(TARGET_TESTARCH)))
   ifneq (,$(findstring __AARCH64EB__ ,$(TARGET_TESTARCH)))
     TARGET_ARCH= -D__AARCH64EB__=1
+  else
+    TARGET_ARCH= -D__ARRCH64__=1
   endif
   TARGET_LJARCH= arm64
+else
+ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
+  TARGET_LJARCH= arm
 else
 ifneq (,$(findstring LJ_TARGET_PPC ,$(TARGET_TESTARCH)))
   ifneq (,$(findstring LJ_LE 1,$(TARGET_TESTARCH)))

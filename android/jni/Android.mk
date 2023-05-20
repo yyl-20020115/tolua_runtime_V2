@@ -1,4 +1,3 @@
-APP_PLATFORM := android-19
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
@@ -6,13 +5,14 @@ LOCAL_MODULE := libluajit
 LOCAL_SRC_FILES := ../../luajit-2.1/src/libluajit.a
 include $(PREBUILT_STATIC_LIBRARY)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := libunwindstack
-LOCAL_SRC_FILES := ../../../unwind/build_arm/libunwindstack_static.a
-include $(PREBUILT_STATIC_LIBRARY)
+#include $(CLEAR_VARS)
+#LOCAL_MODULE := libunwindstack
+#LOCAL_SRC_FILES := ../../../unwind/build_arm/libunwindstack_static.a
+#include $(PREBUILT_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
-LOCAL_LDLIBS += -llog -lc++
+LOCAL_LDFLAGS += 
+LOCAL_LDLIBS += -llog
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := tolua
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../luajit-2.1/src
@@ -62,7 +62,7 @@ LOCAL_SRC_FILES :=	../../tolua.c \
 				    ../../pbc/binding/lua/pbc-lua.c \
 
 LOCAL_WHOLE_STATIC_LIBRARIES += libluajit
-LOCAL_WHOLE_STATIC_LIBRARIES += libunwindstack 
+# LOCAL_WHOLE_STATIC_LIBRARIES += libunwindstack 
 
 include $(BUILD_SHARED_LIBRARY)
 

@@ -253,10 +253,10 @@
 
 #define LJ_ARCH_BITS		64
 #if defined(__AARCH64EB__)
-#define LJ_ARCH_NAME		"arm64be"
+#define LJ_ARCH_NAME		"aarch64be"
 #define LJ_ARCH_ENDIAN		LUAJIT_BE
 #else
-#define LJ_ARCH_NAME		"arm64"
+#define LJ_ARCH_NAME		"aarch64"
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
 #endif
 #define LJ_TARGET_ARM64		1
